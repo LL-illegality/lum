@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luminetst工作坊 - 用户操作</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .operation-container {
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .operation-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .operation-description {
+            margin-bottom: 15px;
+            color: #666;
+        }
+        .operation-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .operation-button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .operation-button:hover {
+            background-color: #45a049;
+        }
+        .operation-button.danger {
+            background-color: #f44336;
+        }
+        .operation-button.danger:hover {
+            background-color: #d32f2f;
+        }
+        .operation-button.warning {
+            background-color: #ff9800;
+        }
+        .operation-button.warning:hover {
+            background-color: #f57c00;
+        }
+        .operation-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #e8f5e9;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Luminetst工作坊</h2>
+        <a href="/">首页</a>
+        <a href="/danger_signals">危险信息监测</a>
+        <a href="/chat">对话测试</a>
+        <a href="/user_operations" class="active">用户操作</a>
+    </div>
+    <div class="content">
+        <div class="chat-container">
+            <h3>用户操作面板</h3>
+            
+            <div class="operation-container">
+                <div class="operation-title">聊天记录管理</div>
+                <div class="operation-description">管理您的聊天历史记录，包括保存、清除和删除操作。</div>
+                <div class="operation-buttons">
+                    <button id="save-button" class="operation-button">保存聊天记录</button>
+                    <button id="clear-button" class="operation-button warning">清除显示记录</button>
+                    <button id="delete-button" class="operation-button danger">删除实际记录</button>
+                </div>
+                <div id="chat-result" class="operation-result"></div>
+            </div>
+
+            <div class="operation-container">
+                <div class="operation-title">用户偏好分析</div>
+                <div class="operation-description">分析您的聊天历史，了解您的兴趣偏好，优化聊天体验。</div>
+                <div class="operation-buttons">
+                    <button id="analyze-button" class="operation-button">启动偏好分析</button>
+                </div>
+                <div id="analyze-result" class="operation-result"></div>
+            </div>
+
+            <div class="operation-container">
+                <div class="operation-title">系统状态</div>
+                <div class="operation-description">查看系统当前状态和运行情况。</div>
+                <div class="operation-buttons">
+                    <button id="status-button" class="operation-button">检查系统状态</button>
+                </div>
+                <div id="status-result" class="operation-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 保存聊天记录
+        const saveButton = document.getElementById('save-button');
+        saveButton.addEventListener('click', saveChatHistoryToFile);
+
+        async function saveChatHistoryToFile() {
+            const resultDiv = document.getElementById('chat-result');
+            try {
+                const response = await fetch('/api/save_history', { method: 'GET' });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    resultDiv.textContent = '聊天记录已成功保存！';
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#e8f5e9';
+                } else {
+                    resultDiv.textContent = '保存聊天记录时出错: ' + data.message;
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#ffebee';
+                }
+            } catch (error) {
+                console.error('请求保存聊天记录时出错:', error);
+                resultDiv.textContent = '请求保存聊天记录时出错，请稍后重试。';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        // 清除显示记录
+        const clearButton = document.getElementById('clear-button');
+        clearButton.addEventListener('click', clearChatHistory);
+
+        function clearChatHistory() {
+            const resultDiv = document.getElementById('chat-result');
+            // 清除 localStorage 中的聊天记录
+            localStorage.removeItem('chatHistory');
+            resultDiv.textContent = '显示记录已清除！';
+            resultDiv.style.display = 'block';
+            resultDiv.style.backgroundColor = '#e8f5e9';
+        }
+        
+        // 删除实际聊天记录
+        const deleteButton = document.getElementById("delete-button");
+        deleteButton.addEventListener('click', deleteRealHistory);
+        
+        async function deleteRealHistory() {
+            const resultDiv = document.getElementById('chat-result');
+            try {
+                const response = await fetch('/api/del_history', { method: 'GET' });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    resultDiv.textContent = '聊天记录已成功删除！';
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#e8f5e9';
+                } else {
+                    resultDiv.textContent = '删除聊天记录时出错: ' + data.message;
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#ffebee';
+                }
+            } catch (error) {
+                console.error('请求删除聊天记录时出错:', error);
+                resultDiv.textContent = '请求删除聊天记录时出错，请稍后重试。';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        // 启动偏好分析
+        const analyzeButton = document.getElementById("analyze-button");
+        analyzeButton.addEventListener('click', analyze_preference);
+        
+        async function analyze_preference() {
+            const resultDiv = document.getElementById('analyze-result');
+            try {
+                const response = await fetch('/api/analyze', { method: 'GET' });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    resultDiv.textContent = '偏好分析已完成并保存！';
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#e8f5e9';
+                } else {
+                    resultDiv.textContent = '分析出错: ' + data.message;
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.backgroundColor = '#ffebee';
+                }
+            } catch (error) {
+                console.error('分析出错:', error);
+                resultDiv.textContent = '分析出错，请稍后重试。';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        // 检查系统状态
+        const statusButton = document.getElementById("status-button");
+        statusButton.addEventListener('click', checkSystemStatus);
+        
+        async function checkSystemStatus() {
+            const resultDiv = document.getElementById('status-result');
+            try {
+                // 这里可以添加实际的系统状态检查逻辑
+                // 目前只是一个示例
+                resultDiv.textContent = '系统运行正常！';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#e8f5e9';
+            } catch (error) {
+                console.error('检查系统状态时出错:', error);
+                resultDiv.textContent = '检查系统状态时出错，请稍后重试。';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#ffebee';
+            }
+        }
+    </script>
+</body>
+</html> 

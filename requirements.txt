@@ -1,0 +1,8 @@
+cozepy
+openai
+pyaudio
+pygame
+numpy
+baidu-aip
+dotenv
+flask

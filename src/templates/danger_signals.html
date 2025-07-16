@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luminetst工作坊 - 危险信号监测</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Luminetst工作坊</h2>
+        <a href="/">首页</a>
+        <a href="/danger_signals">危险信息监测</a>
+        <a href="/chat">对话测试</a>
+
+    </div>
+
+    <div class="content">
+        <div class="container">
+        <div id="signals-container"></div>
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在加载数据...</p>
+        </div>
+    </div>
+    <button class="refresh-button" onclick="fetchSignals()" title="刷新数据">
+        <span class="material-icons">refresh</span>
+    </button>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+        
+        function fetchSignals() {
+            showLoading();
+            fetch('/api/signals')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('signals-container');
+                    container.innerHTML = '';
+                    
+                    data.forEach((signal, index) => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+                        card.style.animationDelay = `${index * 0.1}s`;
+                        card.innerHTML = `
+                            <h3>
+                                <span class="material-icons">person</span>
+                                用户ID: ${signal.user_id || '未知'}
+                            </h3>
+                            <div class="signal-meta">
+                                <span class="signal-time">
+                                    <span class="material-icons">schedule</span>
+                                    ${formatDate(signal.timestamp)}
+                                </span>
+                            </div>
+                            <div class="signal-content">
+                                <h4>
+                                    <span class="material-icons">chat</span>
+                                    聊天记录
+                                </h4>
+                                <pre>${signal.trigger_message || '无记录'}</pre>
+                                <h4>
+                                    <span class="material-icons">psychology</span>
+                                    用户分析
+                                </h4>
+                                <pre>${signal.analyze || '无分析'}</pre>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error fetching signals:', error);
+                    hideLoading();
+                });
+        }
+
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return `${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        // 初始加载数据
+        fetchSignals();
+        
+        // 每30秒自动刷新一次
+        setInterval(fetchSignals, 30000);
+    </script>
+</body>
+</html>

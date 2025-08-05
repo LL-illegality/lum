@@ -1,188 +1,214 @@
 from flask import Flask, render_template, request, jsonify, Response
-import services.chat_service as chat_service
-import services.signal_service as signal_service
-import utils.deepseek as deepseek
-import json,os
-app = Flask(__name__)
+from src.services.coze_chat_service import CozeChatService
+from src.services.signalService import SignalService
+from src.services.analysisService import DeepseekAnalysisService
+import json
+import os
 
-# ===============网页显示显示===============
-@app.route('/')
-def index():
-    return render_template('admin.html')
-
-@app.route('/dashboard')
-def dashboard():
-    return render_template('admin.html')
-
-@app.route('/danger_signals')
-def danger_signals():
-    return render_template('danger_signals.html')
-
-@app.route('/chat')
-def chat_page():
-    return render_template('chat.html')
-
-@app.route('/user_operations')
-def user_operations():
-    return render_template('user_operations.html')
-
-@app.route('/client_chat')
-def client_chat():
-    return render_template('client_chat.html')
-# ==========================================
+class WebApp:
+    """Luminest Web应用"""
+    
+    def __init__(self):
+        """初始化Web应用"""
+        self.app = Flask(__name__)
+        self.chat_service = CozeChatService()
+        self.signal_service = SignalService()
+        self.analysis_service = DeepseekAnalysisService()
+        self.preferences = {}
+        self._setup_routes()
+        
+    def _setup_routes(self):
+        """设置路由"""
+        # 页面路由
+        self.app.add_url_rule('/', 'index', self.index)
+        self.app.add_url_rule('/dashboard', 'dashboard', self.dashboard)
+        self.app.add_url_rule('/danger_signals', 'danger_signals', self.danger_signals)
+        self.app.add_url_rule('/chat', 'chat_page', self.chat_page)
+        self.app.add_url_rule('/user_operations', 'user_operations', self.user_operations)
+        self.app.add_url_rule('/client_chat', 'client_chat', self.client_chat)
+        
+        # API路由
+        self.app.add_url_rule('/api/receive', 'receive_data', self.receive_data, methods=['POST'])
+        self.app.add_url_rule('/api/signals', 'get_signals', self.get_signals, methods=['GET'])
+        self.app.add_url_rule('/api/chat', 'chat_api', self.chat_api, methods=['POST'])
+        self.app.add_url_rule('/api/stream_chat', 'stream_chat_api', self.stream_chat_api, methods=['POST'])
+        self.app.add_url_rule('/api/save_history', 'save_chat_history', self.save_chat_history, methods=['GET'])
+        self.app.add_url_rule('/api/del_history', 'del_history', self.del_history, methods=['GET'])
+        self.app.add_url_rule('/api/analyze', 'analyze', self.analyze, methods=['GET'])
+        
+    # 页面路由处理
+    def index(self):
+        return render_template('admin.html')
+        
+    def dashboard(self):
+        return render_template('admin.html')
+        
+    def danger_signals(self):
+        return render_template('danger_signals.html')
+        
+    def chat_page(self):
+        return render_template('chat.html')
+        
+    def user_operations(self):
+        return render_template('user_operations.html')
+        
+    def client_chat(self):
+        return render_template('client_chat.html')
 
 #危险数据接收与处理
-@app.route('/api/receive', methods=['POST'])
-def receive_data():
-    data = request.json
-    signal_service.add_signal(data)
-    return jsonify({"status": "success"})
-
-#危险数据获取
-@app.route('/api/signals', methods=['GET'])
-def get_signals():
-    return jsonify(signal_service.get_signals())
-
-
-#聊天功能
-@app.route('/api/chat', methods=['POST'])
-def chat_api():
-    data = request.json
-    user_message = data.get('message')
-    if not user_message:
-        return jsonify({'response': "请输入有效的信息。"})
-    try:
-        result = chat_service.process_message(user_message)
-        #将历史记录转换为字符串
-        history_str = ""
-        for i in chat_service.get_chat_history():
-            history_str += i['role'] + ":" + i['content'] + "\n"
-        #危机处理
-        if json.loads(result)['type'] == 'dangerous':
-            signal_service.add_dangerous_chat("测试ID", user_message, deepseek.dangerAnayze(history_str))
-        return jsonify({'response': json.loads(result)['message']})
-    #异常处理
-    except Exception as e:
-        print(f"Error in chat API: {str(e)}")
-        return jsonify({'response': "抱歉，处理您的消息时出现错误，请稍后重试。"})
-
-# 流式聊天功能
-@app.route('/api/stream_chat', methods=['POST'])
-def stream_chat_api():
-    data = request.json
-    user_message = data.get('message')
-    if not user_message:
-        return jsonify({'response': "请输入有效的信息。"})
-    
-    def generate():
-        try:
-            # 将历史记录转换为字符串
-            history_str = ""
-            for i in chat_service.get_chat_history():
-                history_str += i['role'] + ":" + i['content'] + "\n"
+    # API路由处理
+    def receive_data(self):
+        """处理接收到的危险数据"""
+        data = request.json
+        self.signal_service.add_signal(data)
+        return jsonify({"status": "success"})
+        
+    def get_signals(self):
+        """获取所有危险信号"""
+        return jsonify(self.signal_service.get_signals())
+        
+    def chat_api(self):
+        """处理聊天请求"""
+        data = request.json
+        user_message = data.get('message')
+        if not user_message:
+            return jsonify({'response': "请输入有效的信息。"})
             
-            # 处理流式响应
-            for chunk in chat_service.process_stream_message(user_message):
-                try:
-                    # 尝试解析JSON
-                    if isinstance(chunk, str):
-                        json_data = json.loads(chunk)
-                    else:
-                        json_data = chunk
-                        
-                    # 检查是否是危险内容
-                    if json_data.get('type') == 'dangerous':
-                        signal_service.add_dangerous_chat("测试ID", user_message, deepseek.dangerAnayze(history_str))
-                    
-                    # 只发送message字段的内容
-                    if 'message' in json_data:
-                        yield f"data: {json.dumps({'chunk': json_data['message']})}\n\n"
-                    else:
-                        # 如果没有message字段，发送原始内容
-                        yield f"data: {json.dumps({'chunk': str(chunk)})}\n\n"
-                except json.JSONDecodeError:
-                    # 如果不是JSON格式，直接发送文本
-                    yield f"data: {json.dumps({'chunk': str(chunk)})}\n\n"
-                except Exception as e:
-                    print(f"Error processing chunk: {str(e)}")
-                    continue
+        try:
+            result = self.chat_service.process_message(user_message)
+            result_dict = json.loads(result)
+            
+            if result_dict['type'] == 'dangerous':
+                # 获取历史记录并转换为字符串
+                history = self.chat_service.get_chat_history()
+                history_str = "\n".join([f"{msg['role']}:{msg['content']}" for msg in history])
+                
+                # 进行危险分析
+                analysis = self.analysis_service.analyze_danger(history)
+                self.signal_service.add_dangerous_chat("测试ID", user_message, analysis)
+                
+            return jsonify({'response': result_dict['message']})
+            
         except Exception as e:
-            print(f"Error in stream chat API: {str(e)}")
-            yield f"data: {json.dumps({'error': '抱歉，处理您的消息时出现错误，请稍后重试。'})}\n\n"
-    
-    return Response(generate(), mimetype='text/event-stream')
+            print(f"Error in chat API: {str(e)}")
+            return jsonify({'response': "抱歉，处理您的消息时出现错误，请稍后重试。"})
 
-@app.route('/api/save_history', methods=['GET'])
-def save_chat_history():
-    """
-    保存历史记录到文件
-    由于水平有限，本项目没有注意代码复用，编写较为随意。本函数无法指定路径。
-    """
-    history = chat_service.get_chat_history()
-    try:
-        signal_service.save_signals_to_file()
-        with open('chat_history.json', 'w', encoding='utf-8') as f:
-            #indent:缩进以使格式美观 0,2,4等级可选
-            json.dump(history, f, ensure_ascii=False, indent=4)
-        return jsonify({'status': 'success', 'message': '聊天记录已保存'}), 200
-    except Exception as e:
-        print(f'保存聊天记录时出错: {str(e)}')
-        return jsonify({'status': 'error', 'message': '保存聊天记录时出错，请稍后重试'}), 500
-    
-@app.route('/api/del_history',methods=['GET'])
-def del_history():
-    """
-    删除程序中的历史记录(不保存更改)
-    由于水平有限，本项目没有注意代码复用，编写较为随意。本函数无法指定路径。
-    """
-    try:
-        chat_service.delete_chat_history()
-        return jsonify({'status': 'success', 'message': '已经删了'}), 200
-    except Exception as e:
-        print(f'删除聊天记录时出错: {str(e)}')
-        return jsonify({'status': 'error', 'message': '删除聊天记录时出错，请稍后重试'}), 500
-@app.route('/api/analyze',methods=['GET'])
-def analyze():
-    """
-    用户话题喜好分析，为聊天策略服务
-    """
-    try:
-        history_str = ""
-        for i in chat_service.get_chat_history():
-            history_str += i['role'] + ":" + i['content'] + "\n"
-        result = deepseek.preferenceAnayze(history_str)
-        result = json.loads(result)
-        with open('preference.json','w',encoding='utf-8') as f:
-            json.dump(obj=result,fp=f)
-        return jsonify({'status': 'success', 'message': '已经分析完毕并保存到文件'}), 200
-    except Exception as e:
-        print(f'出错: {str(e)}')
-        return jsonify({'status': 'error', 'message': '出错，请稍后重试'}), 500
-
-def load_history():
-    """
-    启动时加载历史记录和历史喜好
-    """
-    global pre
-    pre = {}
-    if os.path.exists('preference.json'):
-        with open('preference.json','r',encoding='utf-8') as f:
-            pre = json.load(fp=f)
-            print("已载入喜好:",pre)
-    else:
-        print("还没保存过喜好记录")
-    if os.path.exists('chat_history,'):
-        with open('chat_history.json','r',encoding='utf-8') as f:
+    def stream_chat_api(self):
+        """处理流式聊天请求"""
+        data = request.json
+        user_message = data.get('message')
+        if not user_message:
+            return jsonify({'response': "请输入有效的信息。"})
+        
+        def generate():
             try:
-                history = json.load(f)
-                chat_service.write_chat_history(history,pre)
-                print("历史记录加载成功!")
+                # 获取历史记录
+                history = self.chat_service.get_chat_history()
+                history_str = "\n".join([f"{msg['role']}:{msg['content']}" for msg in history])
+                
+                # 处理流式响应
+                for chunk in self.chat_service.process_stream_message(user_message):
+                    try:
+                        # 解析响应
+                        json_data = chunk if isinstance(chunk, dict) else json.loads(chunk)
+                        
+                        # 检查是否是危险内容
+                        if json_data.get('type') == 'dangerous':
+                            analysis = self.analysis_service.analyze_danger(history)
+                            self.signal_service.add_dangerous_chat("测试ID", user_message, analysis)
+                        
+                        # 发送响应
+                        if 'message' in json_data:
+                            yield f"data: {json.dumps({'chunk': json_data['message']})}\n\n"
+                        else:
+                            yield f"data: {json.dumps({'chunk': str(chunk)})}\n\n"
+                            
+                    except json.JSONDecodeError:
+                        yield f"data: {json.dumps({'chunk': str(chunk)})}\n\n"
+                    except Exception as e:
+                        print(f"Error processing chunk: {str(e)}")
+                        continue
+                        
             except Exception as e:
-                print("错误:"+str(e))
-    else: print("还没保存过历史记录")
+                print(f"Error in stream chat API: {str(e)}")
+                yield f"data: {json.dumps({'error': '抱歉，处理您的消息时出现错误，请稍后重试。'})}\n\n"
+        
+        return Response(generate(), mimetype='text/event-stream')
+
+    def save_chat_history(self):
+        """保存历史记录到文件"""
+        try:
+            # 保存聊天历史
+            self.chat_service.save_chat_history()
+            # 保存信号
+            self.signal_service.save_signals()
+            return jsonify({'status': 'success', 'message': '聊天记录已保存'}), 200
+        except Exception as e:
+            print(f'保存聊天记录时出错: {str(e)}')
+            return jsonify({'status': 'error', 'message': '保存聊天记录时出错，请稍后重试'}), 500
+    
+    def del_history(self):
+        """删除历史记录"""
+        try:
+            self.chat_service.delete_chat_history()
+            return jsonify({'status': 'success', 'message': '已经删了'}), 200
+        except Exception as e:
+            print(f'删除聊天记录时出错: {str(e)}')
+            return jsonify({'status': 'error', 'message': '删除聊天记录时出错，请稍后重试'}), 500
+            
+    def analyze(self):
+        """分析用户喜好"""
+        try:
+            # 获取历史记录
+            history = self.chat_service.get_chat_history()
+            history_str = "\n".join([f"{msg['role']}:{msg['content']}" for msg in history])
+            
+            # 分析喜好
+            result = self.analysis_service.analyze_preferences(history)
+            
+            # 保存分析结果
+            with open('preference.json', 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
+                
+            return jsonify({'status': 'success', 'message': '已经分析完毕并保存到文件'}), 200
+        except Exception as e:
+            print(f'分析用户喜好时出错: {str(e)}')
+            return jsonify({'status': 'error', 'message': '分析用户喜好时出错，请稍后重试'}), 500
+            
+    def _load_preferences(self):
+        """加载用户喜好"""
+        try:
+            if os.path.exists('preference.json'):
+                with open('preference.json', 'r', encoding='utf-8') as f:
+                    self.preferences = json.load(f)
+                    print("已载入喜好:", self.preferences)
+            else:
+                print("还没保存过喜好记录")
+        except Exception as e:
+            print(f"加载用户喜好时出错: {str(e)}")
+            self.preferences = {}
+            
+    def _load_history(self):
+        """加载聊天历史和信号"""
+        self.chat_service.load_chat_history()
+        self.signal_service.load_signals()
+        self._load_preferences()
+        if self.preferences:
+            self.chat_service.update_user_preferences(self.preferences)
+            
+    def run(self, host='0.0.0.0', port=5000, debug=False):
+        """运行Web应用"""
+        self._load_history()
+        print("Luminest 工作坊网页版启动")
+        self.app.run(host=host, port=port, debug=debug)
+
+
+def create_app():
+    """创建并配置Web应用"""
+    webapp = WebApp()
+    return webapp
+    
+    
 if __name__ == '__main__':
-    load_history()
-    signal_service.load_signals_from_file()
-    print("Luminest 工作坊网页版启动，")
-    # debug=True 代码更改时重载服务器，蛮有用
-    app.run(port=5000,debug=True)
+    app = create_app()
+    app.run(port=5000, debug=True)

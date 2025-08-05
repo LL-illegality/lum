@@ -2,10 +2,10 @@
 Luminest CLI 主程序
 """
 
-from src.services.coze_chat_service import CozeChatService
-from src.services.signalService import SignalService
-from src.services.analysisService import DeepseekAnalysisService
-from src.services.baiduAudioService import BaiduAudioService
+from services.coze_chat_service import CozeChatService
+from services.signal_service import SignalService
+from services.analysis_service import DeepseekAnalysisService
+from services.baidu_audio_service import BaiduAudioService
 import json
 
 class LuminestCLI:

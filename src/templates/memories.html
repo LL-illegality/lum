@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆管理 - Luminest</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Luminest工作坊</h2>
+        <a href="/">首页</a>
+        <a href="/assessment">综合评估</a>
+        <a href="/chat">对话测试</a>
+        <a href="/stream_page">流式对话</a>
+        <a href="/user_operations">用户操作</a>
+        <a href="/danger_signals">危险信息监测</a>
+        <a href="/emotion_monitor">表情监控</a>
+        <a href="/memories" class="active">记忆管理</a>
+        <a href="/diaries">光喵日记</a>
+    </div>
+    <div class="content">
+        <div class="container">
+            <h3>智能体长期记忆</h3>
+            <div style="margin-bottom:16px;">
+                <button id="btn-clear-memories" style="padding:8px 12px; border-radius:6px; background:#d32f2f; color:#fff; border:none; cursor:pointer;">清空所有记忆</button>
+            </div>
+            <div>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f0f0f0;">
+                            <th style="padding:8px; text-align:left;">时间</th>
+                            <th style="padding:8px; text-align:left;">摘要</th>
+                        </tr>
+                    </thead>
+                    <tbody id="memories-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadMemories(){
+            try{
+                const res = await fetch('/api/memories');
+                const data = await res.json();
+                const body = document.getElementById('memories-body');
+                body.innerHTML = '';
+                if(!Array.isArray(data) || data.length===0){
+                    body.innerHTML = '<tr><td colspan="2" style="padding:12px; color:#666; text-align:center;">当前没有长期记忆</td></tr>';
+                    return;
+                }
+                data.slice().reverse().forEach(m=>{
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td style="padding:8px; vertical-align:top; width:180px">${m.timestamp||''}</td><td style="padding:8px">${(m.summary||'').replace(/\n/g,'<br/>')}</td>`;
+                    body.appendChild(tr);
+                });
+            }catch(e){
+                console.error(e);
+                document.getElementById('memories-body').innerHTML = '<tr><td colspan="2" style="padding:12px; color:#c00; text-align:center;">加载失败</td></tr>';
+            }
+        }
+
+        document.getElementById('btn-clear-memories').addEventListener('click', async ()=>{
+            if(!confirm('确认清空所有长期记忆？此操作不可撤销。')) return;
+            try{
+                const res = await fetch('/api/clear_memories', {method:'POST'});
+                const j = await res.json();
+                alert(j.message || j.status);
+                loadMemories();
+            }catch(e){alert('清空失败')}
+        });
+
+        loadMemories();
+    </script>
+</body>
+</html>

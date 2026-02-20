@@ -26,3 +26,4 @@ class Config:
         # 聊天相关配置
         self.maxHistoryLength = 50
         self.cozeCnBaseUrl = "https://www.coze.cn"
+        self.greetings = "你好呀！我是小光喵，很高兴见到你！"

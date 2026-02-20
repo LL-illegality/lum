@@ -4,6 +4,9 @@ from src.services.signalService import SignalService
 from src.services.analysisService import DeepseekAnalysisService
 from src.services.deepfaceEmotionService import DeepfaceEmotionService
 from src.services.baiduAudioService import BaiduAudioService
+from src.services.memoryService import MemoryService
+from src.services.diaryService import DiaryService
+from src.config import Config
 import subprocess
 import tempfile
 import shutil
@@ -29,6 +32,17 @@ class WebApp:
         self.signalService = SignalService()
         self.analysisService = DeepseekAnalysisService()
         self.emotionService = DeepfaceEmotionService()
+        try:
+            self.memoryService = MemoryService()
+        except Exception as e:
+            print(f"初始化 MemoryService 失败: {e}")
+            self.memoryService = None
+        try:
+            self.diaryService = DiaryService()
+        except Exception as e:
+            print(f"初始化 DiaryService 失败: {e}")
+            self.diaryService = None
+        self.config = Config()
         self.preferences = {}
         self._setupRoutes()
         try:
@@ -78,6 +92,16 @@ class WebApp:
         self.app.add_url_rule('/api/emotions', 'getEmotions', self.getEmotions, methods=['GET'])
         self.app.add_url_rule('/api/ai_danger_keywords', 'aiDangerKeywords', self.ai_danger_keywords, methods=['POST'])
         self.app.add_url_rule('/api/ai_crisis_index', 'aiCrisisIndex', self.ai_crisis_index, methods=['POST'])
+        self.app.add_url_rule('/memories', 'memories', self.memories)
+        self.app.add_url_rule('/diaries', 'diaries', self.diaries)
+        self.app.add_url_rule('/api/diaries', 'getDiary', self.get_diary, methods=['GET'])
+        self.app.add_url_rule('/api/list_diaries', 'listDiaries', self.list_diaries, methods=['GET'])
+        self.app.add_url_rule('/api/generate_diary', 'generateDiary', self.generate_diary, methods=['POST'])
+        self.app.add_url_rule('/api/delete_diary', 'deleteDiary', self.delete_diary, methods=['POST'])
+        self.app.add_url_rule('/api/memories', 'getMemories', self.get_memories, methods=['GET'])
+        self.app.add_url_rule('/api/clear_memories', 'clearMemories', self.clear_memories, methods=['POST'])
+        self.app.add_url_rule('/api/proactive_start', 'proactiveStart', self.proactive_start, methods=['GET'])
+        self.app.add_url_rule('/api/save_proactive_conversation', 'saveProactiveConversation', self.save_proactive_conversation, methods=['POST'])
         self.app.add_url_rule('/api/clear_chats', 'clearChats', self.clear_chats, methods=['POST'])
         self.app.add_url_rule('/api/clear_emotions', 'clearEmotions', self.clear_emotions, methods=['POST'])
         self.app.add_url_rule('/api/clear_signals', 'clearSignals', self.clear_signals, methods=['POST'])
@@ -132,6 +156,150 @@ class WebApp:
         except Exception as e:
             print(f"AI危机指数分析失败: {str(e)}")
             return jsonify({"score":0, "interpretation":"分析失败","features":[],"explanation":"","suggestions":"","validation":""})
+        
+    def memories(self):
+        """记忆管理页面"""
+        return render_template('memories.html')
+
+    def get_memories(self):
+        """返回所有长期记忆的 JSON 列表"""
+        try:
+            if self.memoryService is not None:
+                mems = self.memoryService.get_memories()
+                return jsonify(mems)
+            else:
+                print('memoryService 未初始化')
+                return jsonify([])
+        except Exception as e:
+            print(f"获取记忆失败: {e}")
+            return jsonify([])
+
+    def clear_memories(self):
+        """清空长期记忆文件"""
+        try:
+            if self.memoryService is not None:
+                self.memoryService.clear_memories()
+                return jsonify({'status': 'success', 'message': '记忆已清空'})
+            else:
+                return jsonify({'status': 'error', 'message': 'memoryService 未初始化'}), 500
+        except Exception as e:
+            print(f"清空记忆失败: {e}")
+            return jsonify({'status': 'error', 'message': '清空失败'}), 500
+
+    def proactive_start(self):
+        """基于长期记忆生成一条主动开场消息并返回，但不持久化（前端决定是否保存）。"""
+        try:
+            # 如果没有 memory service 返回空字符串
+            if self.memoryService is None:
+                return jsonify({'message': ''})
+            mems = self.memoryService.get_memories()
+            if not mems:
+                return jsonify({'message': self.config.greetings})
+
+            # 使用分析服务生成主动话语
+            try:
+                prompt = self.analysisService.generate_proactive_utterance(mems)
+            except Exception as e:
+                print(f"生成主动开场失败: {e}")
+                prompt = ''
+            # 返回生成的主动消息（不自动持久化）
+            return jsonify({'message': prompt})
+        except Exception as e:
+            print(f"proactive_start 接口错误: {e}")
+            return jsonify({'message': ''})
+
+    def diaries(self):
+        return render_template('diaries.html')
+
+    def get_diary(self):
+        try:
+            date = request.args.get('date') or ''
+            if not date:
+                return jsonify({'content': ''})
+            if self.diaryService is None:
+                return jsonify({'content': ''})
+            content = self.diaryService.read_diary(date)
+            return jsonify({'content': content})
+        except Exception as e:
+            print(f"获取日记失败: {e}")
+            return jsonify({'content': ''})
+
+    def list_diaries(self):
+        try:
+            if self.diaryService is None:
+                return jsonify({'dates': []})
+            dates = self.diaryService.list_diaries()
+            return jsonify({'dates': dates})
+        except Exception as e:
+            print(f"列出日记失败: {e}")
+            return jsonify({'dates': []})
+
+    def generate_diary(self):
+        try:
+            data = request.get_json() or {}
+            date = data.get('date')
+            if not date:
+                return jsonify({'content': '', 'status': 'error', 'message': '缺少日期'}), 400
+            if self.diaryService is None:
+                return jsonify({'content': '', 'status': 'error', 'message': 'DiaryService 未初始化'}), 500
+            content = self.diaryService.generate_diary(date)
+            return jsonify({'content': content, 'status': 'success'})
+        except Exception as e:
+            print(f"生成日记失败: {e}")
+            return jsonify({'content': '', 'status': 'error', 'message': '生成失败'}), 500
+
+    def delete_diary(self):
+        try:
+            data = request.get_json() or {}
+            date = data.get('date')
+            if not date:
+                return jsonify({'status': 'error', 'message': '缺少日期'}), 400
+            if self.diaryService is None:
+                return jsonify({'status': 'error', 'message': 'DiaryService 未初始化'}), 500
+            ok = self.diaryService.delete_diary(date)
+            if ok:
+                return jsonify({'status': 'success', 'message': '已删除'})
+            else:
+                return jsonify({'status': 'error', 'message': '删除失败'}), 500
+        except Exception as e:
+            print(f"删除日记失败: {e}")
+            return jsonify({'status': 'error', 'message': '删除失败'}), 500
+
+    def save_proactive_conversation(self):
+        """保存前端临时展示的主动消息与用户的第一条回复。接受 JSON: {assistant_message, user_message, assistant_ts?, user_ts?} """
+        try:
+            data = request.get_json() or {}
+            assistant_message = data.get('assistant_message', '')
+            user_message = data.get('user_message', '')
+            assistant_ts = data.get('assistant_ts')
+            user_ts = data.get('user_ts')
+
+            if not assistant_message and not user_message:
+                return jsonify({'status': 'error', 'message': '没有要保存的消息'}), 400
+
+            # 保存 assistant 消息（如果存在）
+            if assistant_message:
+                try:
+                    ts = assistant_ts if assistant_ts else None
+                    # chatService.data_service.save_chat 需要 user_id, message, role, timestamp
+                    if hasattr(self, 'chatService') and self.chatService is not None:
+                        self.chatService.data_service.save_chat(user_id='', message=assistant_message, role='assistant', timestamp=ts)
+                except Exception as e:
+                    print(f"保存 assistant 消息失败: {e}")
+
+            # 保存 user 消息（如果存在）
+            if user_message:
+                try:
+                    ts2 = user_ts if user_ts else None
+                    if hasattr(self, 'chatService') and self.chatService is not None:
+                        self.chatService.data_service.save_chat(user_id='', message=user_message, role='user', timestamp=ts2)
+                except Exception as e:
+                    print(f"保存 user 消息失败: {e}")
+
+            return jsonify({'status': 'success', 'message': '已保存'})
+        except Exception as e:
+            print(f"save_proactive_conversation 接口错误: {e}")
+            return jsonify({'status': 'error', 'message': '保存失败'}), 500
         
     # 页面路由处理
     def index(self):

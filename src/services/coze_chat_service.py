@@ -6,6 +6,7 @@ from cozepy import Coze, TokenAuth, Message, ChatEventType, COZE_CN_BASE_URL
 from src.services.baseChatService import BaseChatService
 from src.config import Config
 from src.services.dataService import DataService
+from src.services.memoryService import MemoryService
 
 class CozeChatService(BaseChatService):
     """基于Coze的聊天服务实现"""
@@ -15,6 +16,11 @@ class CozeChatService(BaseChatService):
         self.chatHistory = []
         # 使用 data/chat 作为聊天数据存储目录
         self.data_service = DataService()
+        # 记忆服务（长期记忆管理）
+        try:
+            self.memory_service = MemoryService()
+        except Exception:
+            self.memory_service = None
         token = self.config.cozeApiToken if self.config.cozeApiToken is not None else ""
         if not token:
             raise ValueError("Coze API token is missing. Please set cozeApiToken in the configuration.")
@@ -35,7 +41,23 @@ class CozeChatService(BaseChatService):
             self.data_service.save_chat(user_id="", message=message, role="user", timestamp=user_ts)
         except Exception:
             pass
-        context_messages = self._prepareContextMessages()
+        # 准备上下文消息（暂不在此处生成记忆，记忆将在助手回复后生成并替换旧记忆）
+        try:
+            context_messages = self._prepareContextMessages()
+            # 如果已有记忆文件存在，可将其作为参考插入上下文以增强一致性
+            try:
+                if self.memory_service is not None:
+                    existing = self.memory_service.get_memories()
+                    if existing:
+                        # 将现有记忆合并为一段简短文本插入上下文开头
+                        joined = "； ".join([m.get('summary','') for m in existing if m.get('summary')])
+                        if joined:
+                            mem_msg = Message.build_user_question_text(f"长期记忆摘要: {joined}")
+                            context_messages.insert(0, mem_msg)
+            except Exception:
+                pass
+        except Exception:
+            context_messages = self._prepareContextMessages()
         current = ''
         for event in self.coze.chat.stream(
             bot_id="7499749049093570598",
@@ -55,6 +77,15 @@ class CozeChatService(BaseChatService):
             self.data_service.save_chat(user_id="", message=current, role="assistant", timestamp=assistant_ts)
         except Exception:
             pass
+
+        # 在保存助理回复后生成新的长期记忆（每次交互一次），并以迭代压缩方式替换以前记忆
+        try:
+            if self.memory_service is not None:
+                new_entries = self.memory_service.generate_long_term_memory(self.data_service.get_chats(), event_timestamp=assistant_ts)
+                if new_entries:
+                    print(f"生成并替换长期记忆：{len(new_entries)} 条")
+        except Exception as e:
+            print(f"生成长期记忆失败: {e}")
 
     def processMessage(self, message: str) -> str:
         """处理单条消息"""

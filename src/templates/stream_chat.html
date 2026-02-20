@@ -52,6 +52,7 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <button id="backendBtn" class="secondary" title="发送后台请求并返回主页">保存并返回主页</button>
+          <button id="openDiaryBtn" class="secondary" title="打开光喵日记">📔 日记</button>
         </div>
       </div>
       <div class="messages" id="messages" aria-live="polite"></div>
@@ -75,6 +76,8 @@
   const recordBtn = document.getElementById('recordBtn');
   const statusEl = document.getElementById('status');
   const errorLog = document.getElementById('errorLog');
+  let proactiveTemp = null; // {message, ts, saved}
+  let proactiveSaved = false;
 
   function timeNow(){
     const d = new Date();
@@ -98,6 +101,11 @@
     const meta = document.createElement('div');
     meta.className = 'small timestamp';
     meta.textContent = timeNow();
+
+          // 打开日记页面按钮
+          document.getElementById('openDiaryBtn').addEventListener('click', ()=>{
+            window.open('/diaries','_blank');
+          });
 
     if(cls === 'user'){
       wrapper.appendChild(bubble);
@@ -189,6 +197,22 @@
     }
   }
 
+  // 页面初始化：加载历史，然后始终基于记忆主动发起聊天（仅临时展示）
+  loadHistory().then(()=>{
+    try{
+      fetch('/api/proactive_start')
+        .then(r=>r.json())
+        .then(j=>{
+          if(j && j.message){
+            const bubble = appendMessage(j.message, 'ai');
+            proactiveTemp = { message: j.message, ts: new Date().toISOString(), saved: false, element: bubble };
+            proactiveSaved = false;
+          }
+        })
+        .catch(e=>{ console.warn('proactive_start 请求失败', e); });
+    }catch(e){ console.warn('初始化主动开场检查失败', e); }
+  }).catch(e=>{ console.warn('初始化加载历史失败', e); });
+
   function showError(msg){
     errorLog.hidden = false;
     errorLog.textContent = msg;
@@ -198,6 +222,17 @@
   // 发送消息并从 /api/stream_chat 逐步接收流式回复
   async function sendMessage(text){
     if(!text) return;
+    // 如果存在未保存的主动消息，先将其与当前用户消息一起保存
+    if(proactiveTemp && !proactiveSaved){
+      try{
+        const payload = { assistant_message: proactiveTemp.message, user_message: text, assistant_ts: proactiveTemp.ts, user_ts: new Date().toISOString() };
+        await fetch('/api/save_proactive_conversation', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        proactiveSaved = true;
+      }catch(e){
+        console.warn('保存主动与用户消息失败', e);
+      }
+    }
+
     appendMessage(text, 'user');
     // 静默触发一次表情抓拍并上传（不在界面显示结果）
     try{ silentEmotionCapture().catch(()=>{}); }catch(e){ console.warn('silentEmotionCapture 调用失败', e); }

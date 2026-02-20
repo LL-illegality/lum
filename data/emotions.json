@@ -1,1 +1,135 @@
-[]
+[
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "angry",
+        "timestamp": "2026-02-19T18:47:31.759660",
+        "data": {
+            "dominant_emotion": "angry",
+            "emotions": {
+                "angry": 0.7442225539679033,
+                "disgust": 0.00023528955537613266,
+                "fear": 0.09047665465569253,
+                "happy": 0.0008829002700119315,
+                "sad": 0.12462076007469616,
+                "surprise": 0.00031783874619738776,
+                "neutral": 0.039244002730122615
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "neutral",
+        "timestamp": "2026-02-19T18:54:27.293713",
+        "data": {
+            "dominant_emotion": "neutral",
+            "emotions": {
+                "angry": 0.08070866334300869,
+                "disgust": 2.0546210452176864e-07,
+                "fear": 0.04324251994399185,
+                "happy": 0.0011411922070866016,
+                "sad": 0.034645801899478655,
+                "surprise": 0.00012301711915123123,
+                "neutral": 0.8401386000251785
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "neutral",
+        "timestamp": "2026-02-19T18:55:00.115664",
+        "data": {
+            "dominant_emotion": "neutral",
+            "emotions": {
+                "angry": 0.07447969816936185,
+                "disgust": 2.1635199747505906e-07,
+                "fear": 0.014261956030030023,
+                "happy": 9.264375894378881e-05,
+                "sad": 0.23774179150438438,
+                "surprise": 9.276461667273001e-07,
+                "neutral": 0.6734227665391158
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "fear",
+        "timestamp": "2026-02-20T10:21:57.945267",
+        "data": {
+            "dominant_emotion": "fear",
+            "emotions": {
+                "angry": 2.874418146128465e-08,
+                "disgust": 3.371742625052419e-17,
+                "fear": 0.9988214609323424,
+                "happy": 6.211413890174612e-08,
+                "sad": 0.00013574112672435512,
+                "surprise": 0.0008170455598437992,
+                "neutral": 0.00022566152276915066
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "fear",
+        "timestamp": "2026-02-20T10:22:44.852823",
+        "data": {
+            "dominant_emotion": "fear",
+            "emotions": {
+                "angry": 0.044863672349378325,
+                "disgust": 9.498938520679395e-16,
+                "fear": 0.9549840565431151,
+                "happy": 1.966618704025649e-05,
+                "sad": 0.00012978160780722763,
+                "surprise": 7.790001307273767e-08,
+                "neutral": 2.7454126450277493e-06
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "fear",
+        "timestamp": "2026-02-20T10:29:13.973728",
+        "data": {
+            "dominant_emotion": "fear",
+            "emotions": {
+                "angry": 0.0006434099971637623,
+                "disgust": 1.013034305174275e-15,
+                "fear": 0.9993546825710087,
+                "happy": 1.5600937696131225e-06,
+                "sad": 1.2423509754032895e-08,
+                "surprise": 3.103909257913305e-07,
+                "neutral": 2.452362138952985e-08
+            }
+        },
+        "note": ""
+    },
+    {
+        "type": "emotion",
+        "user_id": "",
+        "trigger_message": "sad",
+        "timestamp": "2026-02-20T10:29:28.899951",
+        "data": {
+            "dominant_emotion": "sad",
+            "emotions": {
+                "angry": 0.0018341260398042746,
+                "disgust": 0.0007903446678812712,
+                "fear": 0.004495509678971555,
+                "happy": 0.003078314238011027,
+                "sad": 0.9762550717520657,
+                "surprise": 2.615254454533315e-07,
+                "neutral": 0.013546372097820752
+            }
+        },
+        "note": ""
+    }
+]
